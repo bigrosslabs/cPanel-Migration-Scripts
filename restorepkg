@@ -1,0 +1,76 @@
+#!/bin/bash
+
+################################
+# CPANEL RESTORE BACKUP SCRIPT #
+################################
+
+SKIPRES=0
+FORCE_RESTORE=0
+
+SERVER_DEST=""
+BACKUP_USER=""
+
+RESTORE_FLAGS=""
+
+function checkVars () {
+	if [ -z "$1" ]; then
+		echo
+		echo -e "ERROR: ${2} cannot be blank!\nAn error has occurred and the script is now terminating..."
+		echo
+		exit
+	fi
+}
+
+function displayHelp () {
+	echo
+	echo "##### RESTORE BACKUP PKG USAGE #####################################################";
+	echo "./restorepkg [-fsh] [-d server hostname or IP] [-u backup username or path]"
+	echo
+	echo "-> OPTIONS"
+	echo "   -d : Server Hostname or IP in which the backup file is located to be restored"
+	echo "   -u : Username or absolute path of the backup package"
+	echo
+	echo "-> FLAGS"
+	echo "   -f : Force restore of backup using the --force flag"
+	echo "   -s : Skip reseller permissions when restoring using the --skipres flag"
+	echo "   -h : View Help"
+	echo
+	exit
+}
+
+while getopts 'fshd:u:' OPTION
+do
+	case $OPTION in
+		f) FORCE_RESTORE=1;;
+		s) SKIPRES=1;;
+		h) displayHelp;;
+		
+		d) SERVER_DEST="$OPTARG";;
+		u) BACKUP_USER="$OPTARG";;
+		
+		?) displayHelp;;
+	esac
+done
+shift $(($OPTIND - 1))
+
+checkVars "$SERVER_DEST" "Server Hostname/IP [-d]"
+checkVars "$BACKUP_USER" "Backup Package Username or Path [-u]"
+
+if [ $SKIPRES -eq 0 ]; then
+	echo
+	read -r -p "Are you sure you want to restore backup without using --skipres? [y/n] " response
+	if [[ $response =~ ^[Yy]$ ]]; then
+		SKIPRES=0
+	else
+		SKIPRES=1
+		RESTORE_FLAGS=" --skipres"
+	fi
+else
+	RESTORE_FLAGS=" --skipres"
+fi
+
+if [ $FORCE_RESTORE -eq 1 ]; then
+	RESTORE_FLAGS="$RESTORE_FLAGS --force"
+fi
+
+ssh -q -t root@$SERVER_DEST "echo STARTRESTORE && echo \`/scripts/restorepkg${RESTORE_FLAGS} ${BACKUP_USER} && echo ENDRESTORE\`"
